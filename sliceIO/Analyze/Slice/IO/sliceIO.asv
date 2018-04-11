@@ -17,8 +17,7 @@ function [R] = sliceIO(dataAnalysisParams, doSave)
 global DATA_DIR;
 
 if nargin < 3; doSave = false; end
-%if nargin < 2; 
-%analysisParams = setAnalysisParams; end
+if nargin < 2; analysisParams = setAnalysisParams(); end
 fn = dataAnalysisParams.fname(1:end-1); % FileName
 
 % Get the data
@@ -45,7 +44,7 @@ end
 hdr.lNumSamplesPerEpisode = npoints;
 hdr.nADCNumChannels = nchan;
 hdr.lActualEpisodes = nepochs;
-dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur;
+analysisParams.io.maxT = analysisParams.io.pulsestart + analysisParams.io.pulsedur;
 
 sampRate = 1/(sampInterval*1e-6); % convert sample interval to frequency
 tvec = (sampInterval*1e-3)*(0:(hdr.lNumSamplesPerEpisode-1)); % Time vector
@@ -77,7 +76,7 @@ end
 
 if hdr.nADCNumChannels == 1
     %number of channels
-    I = waveform_create(dataAnalysisParams, tvec, size(data,3));
+    I = waveform_create(analysisParams, tvec, size(data,3));
     V = squeeze(data(:,1,:));
 else
     % Get voltage channel and current channel in spreadsheet otherwise just
@@ -96,14 +95,14 @@ else
     % Timing of current waveform 
     [~, wfstart] = min(diff(I(:,1))); % derivative marks onset & offset
     [~, wfend] = max(diff(I(:,1)));
-    dataAnalysisParams.io.pulsestart = wfstart/sampRate*1000; % when the pulse starts
-    dataAnalysisParams.io.pulsedur = (wfend - wfstart)/sampRate*1000; % when the pulse ends
-    dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur; % end of the paradigm
+    analysisParams.io.pulsestart = wfstart/sampRate*1000; % when the pulse starts
+    analysisParams.io.pulsedur = (wfend - wfstart)/sampRate*1000; % when the pulse ends
+    analysisParams.io.maxT = analysisParams.io.pulsestart + analysisParams.io.pulsedur; % end of the paradigm
     
     % Amplitude of the waveform
     steps = mean(I(wfstart:wfend,:));
-    dataAnalysisParams.io.pampstep = mean(diff(steps));
-    dataAnalysisParams.io.pampstart = min(steps);
+    analysisParams.io.pampstep = mean(diff(steps));
+    analysisParams.io.pampstart = min(steps);
 end
 
 V = V + vOffset;
@@ -117,7 +116,7 @@ axes_text_style();
 %---------------------- Membrane properties and the like -----------------%
 % Get the memobrane properties
 [fcount, figs] = figure_set(fcount, figs, [upper(fn) '-Ih Calculation']);
-[mp] = membrane_properties(V, hdr, dataAnalysisParams, sampRate);
+[mp] = membrane_properties(V, hdr, analysisParams, sampRate);
         
 [fcount, figs] = figure_set(fcount, figs, [upper(fn) '-Input resistance']);
 plot(mp.pulses(1:length(mp.sag_peak)),mp.sag_peak, '.', 'MarkerSize', 20);
@@ -132,7 +131,7 @@ ylabel('mV');
 %----------------- Spike analysis ---------------------------------------%
 
 % Find all the spikes
-[Spikes] = findSpikes(V, tvec, dataAnalysisParams);
+[Spikes] = findSpikes(V, tvec, analysisParams);
 
 % Store some parameters
 Spikes.sampRate = sampRate;
@@ -145,7 +144,7 @@ Spikes.hdr = hdr;
 % Maybe at some point 2 cells (or more) will be recorded from??
 cmap = colormap(lines);
 
-ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), dataAnalysisParams.io.ch_to_analyze);
+ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), analysisParams.io.ch_to_analyze);
 [fcount, figs] = figure_set(fcount, figs, ftext);
 
 for j = 1:hdr.lActualEpisodes
@@ -153,7 +152,7 @@ for j = 1:hdr.lActualEpisodes
     plot(tvec,V(:,j));
     xlabel('Time(ms)', 'FontSize', 6);
     ylabel(hdr.recChUnits{vchan}, 'FontSize', 6);
-    axis([0 tvec(end) dataAnalysisParams.io.yaxis]);
+    axis([0 tvec(end) analysisParams.io.yaxis]);
     
     % Plot the peaks
     if ~isempty(Spikes.pks{j})   
@@ -161,7 +160,7 @@ for j = 1:hdr.lActualEpisodes
         plot(tvec(Spikes.locs{j}), Spikes.pks{j}, '.r', 'LineStyle', 'none');
         hold off;
     end
-    lv(j) = locVar(tvec, Spikes.locs{j}, dataAnalysisParams);
+    lv(j) = locVar(tvec, Spikes.locs{j}, analysisParams);
     
     if lv(j) >= 0
         title(sprintf('Lv = %6.4f', lv(j)));
@@ -181,7 +180,7 @@ l_text = {};
 subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
 for j = 1:hdr.lActualEpisodes
     hold on;
-    if ~(length(Spikes.locs{j}) < dataAnalysisParams.io.minspikes) && (min(tvec(Spikes.locs{j}))< dataAnalysisParams.io.maxT)
+    if ~(length(Spikes.locs{j}) < analysisParams.io.minspikes) && (min(tvec(Spikes.locs{j}))< analysisParams.io.maxT)
         ccount = ccount + 1;
         ISI = diff(tvec(Spikes.locs{j}));
         plot(ISI, 'Color',cmap(ccount,:));
@@ -200,12 +199,12 @@ axis([0 max(xlim) 0 max(ylim)]);
 set(gca, 'FontSize', 6);
 
 % Keep some paramaters that might have changed
-Spikes.ap = dataAnalysisParams;
+Spikes.ap = analysisParams;
 
 %----------------- Individual Spike display --------------------------%
 
 % Display all the spikes
-w = dataAnalysisParams.io.spikewindowtime*1e-3*sampRate;
+w = analysisParams.io.spikewindowtime*1e-3*sampRate;
 t = (-w:w)/sampRate*1e3;
 
 ftext = sprintf('%s - ISI Channel # %d',upper(fn), vchan);
@@ -219,11 +218,11 @@ for j = 1:hdr.lActualEpisodes
         sp = [];
         sp_count = 0;
         for s = 1:length(Spikes.locs{j})
-            if tvec(Spikes.locs{j}(s)) < dataAnalysisParams.io.maxT && Spikes.locs{j}(s) > w
+            if tvec(Spikes.locs{j}(s)) < analysisParams.io.maxT && Spikes.locs{j}(s) > w
                 sp_count = sp_count +1;
-                sp(sp_count,:) = data((Spikes.locs{j}(s)-w):(Spikes.locs{j}(s)+w),dataAnalysisParams.io.ch_to_analyze,j);
+                sp(sp_count,:) = data((Spikes.locs{j}(s)-w):(Spikes.locs{j}(s)+w),analysisParams.io.ch_to_analyze,j);
                 % Display the first x spikes 
-                if (sp_count <= dataAnalysisParams.io.firstspikestodisp)
+                if (sp_count <= analysisParams.io.firstspikestodisp)
                     plot(t,sp(sp_count,:), 'Color', cmap(sp_count,:));
                 else
                     plot(t,sp(sp_count,:), 'Color', [.7 .7 .7]);
@@ -235,7 +234,7 @@ for j = 1:hdr.lActualEpisodes
         spikes{j} = sp;
 
         title(sprintf('Episode #%d', j));
-        axis([t(1) t(end) dataAnalysisParams.io.yaxis]);
+        axis([t(1) t(end) analysisParams.io.yaxis]);
     end
 end
 linkaxes(ax,'xy');
@@ -278,7 +277,7 @@ R.mp = mp;
 [F, ~, ~] = collect_features(R);
 
 feat{1} = F;
-[all_features] = collapse_feature(feat, dataAnalysisParams.io.features, dataAnalysisParams.io.normalize);
+[all_features] = collapse_feature(feat, analysisParams.io.features, analysisParams.io.normalize);
 
 %----------------------- Export the plots -------------------------------%
 global FIGURE_DIR;

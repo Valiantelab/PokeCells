@@ -13,8 +13,7 @@ function [F, S, SR] = collect_features(R, ap)
 %   SR = cell array of sampling rates - (needed to reconstruct the time
 %       series
 
-if nargin < 2; ap = setAnalysisParams(); end;
-%you're calling this thing too much, it makes the code rlly slow...
+if nargin < 2; ap = setAnalysisParams(); end; %
 
 % Interate over each epoch
 for e=1:numel(R.spikes)        
@@ -23,9 +22,9 @@ for e=1:numel(R.spikes)
     if min(size(R.spikes{e}))
         for s = 1:min(size(R.spikes{e}))
             count = count + 1;
-            F{e}{count} = spike_features(R.spikes{e}(s,:),  R(1).S.sampRate, ap);
+            F{e}{count} = spike_features(R.spikes{e}(s,:),  R(1).S.sr, ap);
             S{e}{count} = R.spikes{e}(s,:);
-            SR{e}{count} = R.S.sampRate; % Keep the sampling rate so can plot each spike properly
+            SR{e}{count} = R.S.sr; % Keep the sampling rate so can plot each spike properly
         end       
     end
 end

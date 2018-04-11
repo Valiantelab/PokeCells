@@ -12,7 +12,9 @@ function [ss, ap] = excel_read(Dir, fname)
 %ss: spreadsheet
 %sf: special field
 
-sf_names = {'Comment', 'ExportDir', 'Tags', 'GroupInc'};
+
+def_params = sl_sync_params();
+sf_names = def_params.sf.names;
 
 full_path = fullfile(Dir,[fname '.xlsx']);
 
@@ -59,7 +61,7 @@ if max(cellfun(@isempty,  {ss.txt{2:end,2}})) == 1
 end
 
 for i=1:nfiles
-    ap(i) = setAnalysisParams();
+    ap(i) = sl_sync_params();
     ap(i).Dir = ss.txt{i+1,1};
     ap(i).fname = ss.txt{i+1,2};
     ap(i).cond.names = {};
