@@ -16,6 +16,11 @@ function [F, S, SR] = collect_features(R, ap)
 if nargin < 2; ap = setAnalysisParams(); end;
 %you're calling this thing too much, it makes the code rlly slow...
 
+%somehow MATLAB was not assigning things...
+F = {};
+S = {};
+SR = {};
+
 % Interate over each epoch
 for e=1:numel(R.spikes)        
     % Interate over each spike

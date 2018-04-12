@@ -8,6 +8,7 @@ DATA_DIR = 'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\';
 addpath(genpath(DATA_DIR));
 
 excelName = 'sampleIO';
+
 [~, ap] = excel_read(strcat(DATA_DIR, '\Total5\'), excelName);
 
 for i = 1:length(ap)

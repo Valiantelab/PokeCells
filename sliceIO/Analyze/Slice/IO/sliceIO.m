@@ -132,12 +132,12 @@ ylabel('mV');
 %----------------- Spike analysis ---------------------------------------%
 
 % Find all the spikes
-[Spikes] = findSpikes(V, tvec, dataAnalysisParams);
+[FoundSpikes] = findSpikes(V, tvec, dataAnalysisParams);
 
 % Store some parameters
-Spikes.sampRate = sampRate;
-Spikes.tvec = tvec;
-Spikes.hdr = hdr;
+FoundSpikes.sampRate = sampRate;
+FoundSpikes.tvec = tvec;
+FoundSpikes.hdr = hdr;
 
 % Get plot layout
 [r, c] = rc_plot(hdr.lActualEpisodes+1);
@@ -148,47 +148,48 @@ cmap = colormap(lines);
 ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), dataAnalysisParams.io.ch_to_analyze);
 [fcount, figs] = figure_set(fcount, figs, ftext);
 
-for j = 1:hdr.lActualEpisodes
-    ax(j) = subplot(r,c,j);
-    plot(tvec,V(:,j));
+for episode = 1:hdr.lActualEpisodes
+    ax(episode) = subplot(r,c,episode);
+    plot(tvec,V(:,episode));
     xlabel('Time(ms)', 'FontSize', 6);
     ylabel(hdr.recChUnits{vchan}, 'FontSize', 6);
     axis([0 tvec(end) dataAnalysisParams.io.yaxis]);
     
     % Plot the peaks
-    if ~isempty(Spikes.pks{j})   
+    if ~isempty(FoundSpikes.pks{episode})   
         hold on;
-        plot(tvec(Spikes.locs{j}), Spikes.pks{j}, '.r', 'LineStyle', 'none');
+        plot(tvec(FoundSpikes.locs{episode}), FoundSpikes.pks{episode}, '.r', 'LineStyle', 'none');
         hold off;
     end
-    lv(j) = locVar(tvec, Spikes.locs{j}, dataAnalysisParams);
+    lv(episode) = locVar(tvec, FoundSpikes.locs{episode}, dataAnalysisParams);
     
-    if lv(j) >= 0
-        title(sprintf('Lv = %6.4f', lv(j)));
+    if lv(episode) >= 0
+        title(sprintf('Lv = %6.4f', lv(episode)));
     else
-        title(sprintf('Episode #%d', j));
+        title(sprintf('Episode #%d', episode));
     end
     set(gca, 'FontSize', 6);
 end
 linkaxes(ax,'xy');
 
 % Store the Lvs of Shinomoto
-Spikes.lv = lv;
+FoundSpikes.lv = lv;
 
 ccount = 0;
 l_text = {};
 % Plot the ISI as a function of spike number
 subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
-for j = 1:hdr.lActualEpisodes
+for episode = 1:hdr.lActualEpisodes
     hold on;
-    if ~(length(Spikes.locs{j}) < dataAnalysisParams.io.minspikes) && (min(tvec(Spikes.locs{j}))< dataAnalysisParams.io.maxT)
+    if ~(FoundSpikes.num{episode}< dataAnalysisParams.io.minspikes) && (min(tvec(FoundSpikes.locs{episode}))< dataAnalysisParams.io.maxT)
+    %if ~(length(FoundSpikes.locs{episode}) < dataAnalysisParams.io.minspikes) && (min(tvec(FoundSpikes.locs{episode}))< dataAnalysisParams.io.maxT)
         ccount = ccount + 1;
-        ISI = diff(tvec(Spikes.locs{j}));
+        ISI = diff(tvec(FoundSpikes.locs{episode}));
         plot(ISI, 'Color',cmap(ccount,:));
-        l_text{ccount} = sprintf('%d',j);
-        Spikes.isi{j} = ISI;
+        l_text{ccount} = sprintf('%d',episode);
+        FoundSpikes.isi{episode} = ISI;
     else
-        Spikes.isi{j} = {};
+        FoundSpikes.isi{episode} = {};
     end 
 end
 hold off;
@@ -200,42 +201,46 @@ axis([0 max(xlim) 0 max(ylim)]);
 set(gca, 'FontSize', 6);
 
 % Keep some paramaters that might have changed
-Spikes.ap = dataAnalysisParams;
+FoundSpikes.ap = dataAnalysisParams;
 
 %----------------- Individual Spike display --------------------------%
 
 % Display all the spikes
-w = dataAnalysisParams.io.spikewindowtime*1e-3*sampRate;
-t = (-w:w)/sampRate*1e3;
+spikeWindow = dataAnalysisParams.io.spikewindowtime*1e-3*sampRate;
+spiketVec = (-spikeWindow:spikeWindow)/sampRate*1e3;
 
 ftext = sprintf('%s - ISI Channel # %d',upper(fn), vchan);
 [~, figs] = figure_set(fcount, figs, ftext);
 
-for j = 1:hdr.lActualEpisodes
-    ax(j) = subplot(r,c,j);
+SpikeWf = {};
+for episode = 1:hdr.lActualEpisodes
+    ax(episode) = subplot(r,c,episode);
     set(gca, 'FontSize', 6);
-    if ~isempty(length(Spikes.locs{j}))
+    %if ~isempty(length(FoundSpikes.locs{j}))
+    if (FoundSpikes.num{episode}) %skip if 0 spikes found
         hold on;
-        sp = [];
         sp_count = 0;
-        for s = 1:length(Spikes.locs{j})
-            if tvec(Spikes.locs{j}(s)) < dataAnalysisParams.io.maxT && Spikes.locs{j}(s) > w
+        for spikeIndex = 1:FoundSpikes.num{episode}
+            if tvec(FoundSpikes.locs{episode}(spikeIndex)) < dataAnalysisParams.io.maxT && FoundSpikes.locs{episode}(spikeIndex) > spikeWindow
                 sp_count = sp_count +1;
-                sp(sp_count,:) = data((Spikes.locs{j}(s)-w):(Spikes.locs{j}(s)+w),dataAnalysisParams.io.ch_to_analyze,j);
+                startIndex = FoundSpikes.locs{episode}(spikeIndex)-spikeWindow;
+                endIndex = FoundSpikes.locs{episode}(spikeIndex)+spikeWindow;
+                SpikeWf{episode} = data(startIndex:endIndex, dataAnalysisParams.io.ch_to_analyze, episode)';
+                
                 % Display the first x spikes 
                 if (sp_count <= dataAnalysisParams.io.firstspikestodisp)
-                    plot(t,sp(sp_count,:), 'Color', cmap(sp_count,:));
+                    plot(spiketVec, SpikeWf{episode}, 'Color', cmap(sp_count,:));
                 else
-                    plot(t,sp(sp_count,:), 'Color', [.7 .7 .7]);
+                    plot(spiketVec,SpikeWf{episode}, 'Color', [.7 .7 .7]);
                 end
             end
         end
 
         hold off;
-        spikes{j} = sp;
+        %SpikeWf{episode} = sp;
 
-        title(sprintf('Episode #%d', j));
-        axis([t(1) t(end) dataAnalysisParams.io.yaxis]);
+        title(sprintf('Episode #%d', episode));
+        axis([spiketVec(1) spiketVec(end) dataAnalysisParams.io.yaxis]);
     end
 end
 linkaxes(ax,'xy');
@@ -245,14 +250,14 @@ l_text = {};
 % Plot the spike amplitudes
 subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
 max_peaks = -1;
-for j = 1:hdr.lActualEpisodes
+for episode = 1:hdr.lActualEpisodes
     hold on;
-    if ~isempty(Spikes.pks{j})
+    if ~isempty(FoundSpikes.pks{episode})
         ccount = ccount + 1;
-        plot(Spikes.pks{j}, 'Color',cmap(ccount,:));
-        l_text{ccount} = sprintf('%d',j);
-        if length(Spikes.pks{j}) > max_peaks
-            max_peaks = length(Spikes.pks{j});
+        plot(FoundSpikes.pks{episode}, 'Color',cmap(ccount,:));
+        l_text{ccount} = sprintf('%d',episode);
+        if length(FoundSpikes.pks{episode}) > max_peaks
+            max_peaks = length(FoundSpikes.pks{episode});
         end
     end 
 end
@@ -266,13 +271,13 @@ end
 set(gca, 'FontSize', 6);
 
 %-------------------------- SUMMARY NUMBERS -----------------------------%
-if  prod(double(cellfun('isempty', Spikes.pks))) == 1
-    display('NO spikes detected for this cell...no summary stats')
+if  prod(double(cellfun('isempty', FoundSpikes.pks))) == 1
+    disp('NO spikes detected for this cell...no summary stats')
     return;
 end
 
-R.spikes = spikes;
-R.S = Spikes;
+R.spikes = SpikeWf;
+R.S = FoundSpikes;
 R.mp = mp;
 
 [F, ~, ~] = collect_features(R);
@@ -301,14 +306,20 @@ warning('off');
 for j=1:nepochs
     ts = squeeze(data(:,j));
     [Spikes.pks{j},Spikes.locs{j}] = findpeaks(ts, 'MINPEAKHEIGHT', analysisParams.io.minpeakheight);
+    
+    %check if spikes are within current injection period
     ind = find(tvec(Spikes.locs{j}) > analysisParams.io.pulsestart  & tvec(Spikes.locs{j}) < (analysisParams.io.pulsestart+analysisParams.io.pulsedur));
+    
     if ~isempty(ind)
         Spikes.pks{j} = Spikes.pks{j}(ind);
         Spikes.locs{j} = Spikes.locs{j}(ind);
+        Spikes.num{j} = [length(ind)];
     else
         Spikes.pks{j} = [];
         Spikes.locs{j} = [];
+        Spikes.num{j} = [0];
     end
+    
 end
 
 warning('on');

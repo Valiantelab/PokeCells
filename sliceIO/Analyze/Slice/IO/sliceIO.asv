@@ -17,7 +17,8 @@ function [R] = sliceIO(dataAnalysisParams, doSave)
 global DATA_DIR;
 
 if nargin < 3; doSave = false; end
-if nargin < 2; analysisParams = setAnalysisParams(); end
+%if nargin < 2; 
+%analysisParams = setAnalysisParams; end
 fn = dataAnalysisParams.fname(1:end-1); % FileName
 
 % Get the data
@@ -44,7 +45,7 @@ end
 hdr.lNumSamplesPerEpisode = npoints;
 hdr.nADCNumChannels = nchan;
 hdr.lActualEpisodes = nepochs;
-analysisParams.io.maxT = analysisParams.io.pulsestart + analysisParams.io.pulsedur;
+dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur;
 
 sampRate = 1/(sampInterval*1e-6); % convert sample interval to frequency
 tvec = (sampInterval*1e-3)*(0:(hdr.lNumSamplesPerEpisode-1)); % Time vector
@@ -76,7 +77,7 @@ end
 
 if hdr.nADCNumChannels == 1
     %number of channels
-    I = waveform_create(analysisParams, tvec, size(data,3));
+    I = waveform_create(dataAnalysisParams, tvec, size(data,3));
     V = squeeze(data(:,1,:));
 else
     % Get voltage channel and current channel in spreadsheet otherwise just
@@ -95,14 +96,14 @@ else
     % Timing of current waveform 
     [~, wfstart] = min(diff(I(:,1))); % derivative marks onset & offset
     [~, wfend] = max(diff(I(:,1)));
-    analysisParams.io.pulsestart = wfstart/sampRate*1000; % when the pulse starts
-    analysisParams.io.pulsedur = (wfend - wfstart)/sampRate*1000; % when the pulse ends
-    analysisParams.io.maxT = analysisParams.io.pulsestart + analysisParams.io.pulsedur; % end of the paradigm
+    dataAnalysisParams.io.pulsestart = wfstart/sampRate*1000; % when the pulse starts
+    dataAnalysisParams.io.pulsedur = (wfend - wfstart)/sampRate*1000; % when the pulse ends
+    dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur; % end of the paradigm
     
     % Amplitude of the waveform
     steps = mean(I(wfstart:wfend,:));
-    analysisParams.io.pampstep = mean(diff(steps));
-    analysisParams.io.pampstart = min(steps);
+    dataAnalysisParams.io.pampstep = mean(diff(steps));
+    dataAnalysisParams.io.pampstart = min(steps);
 end
 
 V = V + vOffset;
@@ -116,7 +117,7 @@ axes_text_style();
 %---------------------- Membrane properties and the like -----------------%
 % Get the memobrane properties
 [fcount, figs] = figure_set(fcount, figs, [upper(fn) '-Ih Calculation']);
-[mp] = membrane_properties(V, hdr, analysisParams, sampRate);
+[mp] = membrane_properties(V, hdr, dataAnalysisParams, sampRate);
         
 [fcount, figs] = figure_set(fcount, figs, [upper(fn) '-Input resistance']);
 plot(mp.pulses(1:length(mp.sag_peak)),mp.sag_peak, '.', 'MarkerSize', 20);
@@ -131,12 +132,12 @@ ylabel('mV');
 %----------------- Spike analysis ---------------------------------------%
 
 % Find all the spikes
-[Spikes] = findSpikes(V, tvec, analysisParams);
+[FoundSpikes] = findSpikes(V, tvec, dataAnalysisParams);
 
 % Store some parameters
-Spikes.sampRate = sampRate;
-Spikes.tvec = tvec;
-Spikes.hdr = hdr;
+FoundSpikes.sampRate = sampRate;
+FoundSpikes.tvec = tvec;
+FoundSpikes.hdr = hdr;
 
 % Get plot layout
 [r, c] = rc_plot(hdr.lActualEpisodes+1);
@@ -144,50 +145,50 @@ Spikes.hdr = hdr;
 % Maybe at some point 2 cells (or more) will be recorded from??
 cmap = colormap(lines);
 
-ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), analysisParams.io.ch_to_analyze);
+ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), dataAnalysisParams.io.ch_to_analyze);
 [fcount, figs] = figure_set(fcount, figs, ftext);
 
-for j = 1:hdr.lActualEpisodes
-    ax(j) = subplot(r,c,j);
-    plot(tvec,V(:,j));
+for episode = 1:hdr.lActualEpisodes
+    ax(episode) = subplot(r,c,episode);
+    plot(tvec,V(:,episode));
     xlabel('Time(ms)', 'FontSize', 6);
     ylabel(hdr.recChUnits{vchan}, 'FontSize', 6);
-    axis([0 tvec(end) analysisParams.io.yaxis]);
+    axis([0 tvec(end) dataAnalysisParams.io.yaxis]);
     
     % Plot the peaks
-    if ~isempty(Spikes.pks{j})   
+    if ~isempty(FoundSpikes.pks{episode})   
         hold on;
-        plot(tvec(Spikes.locs{j}), Spikes.pks{j}, '.r', 'LineStyle', 'none');
+        plot(tvec(FoundSpikes.locs{episode}), FoundSpikes.pks{episode}, '.r', 'LineStyle', 'none');
         hold off;
     end
-    lv(j) = locVar(tvec, Spikes.locs{j}, analysisParams);
+    lv(episode) = locVar(tvec, FoundSpikes.locs{episode}, dataAnalysisParams);
     
-    if lv(j) >= 0
-        title(sprintf('Lv = %6.4f', lv(j)));
+    if lv(episode) >= 0
+        title(sprintf('Lv = %6.4f', lv(episode)));
     else
-        title(sprintf('Episode #%d', j));
+        title(sprintf('Episode #%d', episode));
     end
     set(gca, 'FontSize', 6);
 end
 linkaxes(ax,'xy');
 
 % Store the Lvs of Shinomoto
-Spikes.lv = lv;
+FoundSpikes.lv = lv;
 
 ccount = 0;
 l_text = {};
 % Plot the ISI as a function of spike number
 subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
-for j = 1:hdr.lActualEpisodes
+for episode = 1:hdr.lActualEpisodes
     hold on;
-    if ~(length(Spikes.locs{j}) < analysisParams.io.minspikes) && (min(tvec(Spikes.locs{j}))< analysisParams.io.maxT)
+    if ~(length(FoundSpikes.locs{episode}) < dataAnalysisParams.io.minspikes) && (min(tvec(FoundSpikes.locs{episode}))< dataAnalysisParams.io.maxT)
         ccount = ccount + 1;
-        ISI = diff(tvec(Spikes.locs{j}));
+        ISI = diff(tvec(FoundSpikes.locs{episode}));
         plot(ISI, 'Color',cmap(ccount,:));
-        l_text{ccount} = sprintf('%d',j);
-        Spikes.isi{j} = ISI;
+        l_text{ccount} = sprintf('%d',episode);
+        FoundSpikes.isi{episode} = ISI;
     else
-        Spikes.isi{j} = {};
+        FoundSpikes.isi{episode} = {};
     end 
 end
 hold off;
@@ -199,42 +200,46 @@ axis([0 max(xlim) 0 max(ylim)]);
 set(gca, 'FontSize', 6);
 
 % Keep some paramaters that might have changed
-Spikes.ap = analysisParams;
+FoundSpikes.ap = dataAnalysisParams;
 
 %----------------- Individual Spike display --------------------------%
 
 % Display all the spikes
-w = analysisParams.io.spikewindowtime*1e-3*sampRate;
-t = (-w:w)/sampRate*1e3;
+spikeWindow = dataAnalysisParams.io.spikewindowtime*1e-3*sampRate;
+spiketVec = (-spikeWindow:spikeWindow)/sampRate*1e3;
 
 ftext = sprintf('%s - ISI Channel # %d',upper(fn), vchan);
 [~, figs] = figure_set(fcount, figs, ftext);
 
-for j = 1:hdr.lActualEpisodes
-    ax(j) = subplot(r,c,j);
+for episode = 1:hdr.lActualEpisodes
+    ax(episode) = subplot(r,c,episode);
     set(gca, 'FontSize', 6);
-    if ~isempty(length(Spikes.locs{j}))
+    %if ~isempty(length(FoundSpikes.locs{j}))
+    if ~(FoundSpikes.num{episode})
         hold on;
-        sp = [];
+        %sp = [];
         sp_count = 0;
-        for s = 1:length(Spikes.locs{j})
-            if tvec(Spikes.locs{j}(s)) < analysisParams.io.maxT && Spikes.locs{j}(s) > w
+        for spikeIndex = 1:FoundSpikes.num{episode}
+            if tvec(FoundSpikes.locs{episode}(spikeIndex)) < dataAnalysisParams.io.maxT && FoundSpikes.locs{episode}(spikeIndex) > spikeWindow
                 sp_count = sp_count +1;
-                sp(sp_count,:) = data((Spikes.locs{j}(s)-w):(Spikes.locs{j}(s)+w),analysisParams.io.ch_to_analyze,j);
+                startIndex = FoundSpikes.locs{episode}(spikeIndex)-spikeWindow;
+                endIndex = FoundSpikes.locs{episode}(spikeIndex)+spikeWindow;
+                SpikeWf{episode} = data(startIndex:endIndex, dataAnalysisParams.io.ch_to_analyze, episode);
+                %sp(sp_count,:) = data((FoundSpikes.locs{episode}(spikeIndex)-spikeWindow):(FoundSpikes.locs{episode}(spikeIndex)+spikeWindow),dataAnalysisParams.io.ch_to_analyze,episode);
                 % Display the first x spikes 
-                if (sp_count <= analysisParams.io.firstspikestodisp)
-                    plot(t,sp(sp_count,:), 'Color', cmap(sp_count,:));
+                if (sp_count <= dataAnalysisParams.io.firstspikestodisp)
+                    plot(spiketVec,sp(sp_count,:), 'Color', cmap(sp_count,:));
                 else
-                    plot(t,sp(sp_count,:), 'Color', [.7 .7 .7]);
+                    plot(spiketVec,sp(sp_count,:), 'Color', [.7 .7 .7]);
                 end
             end
         end
 
         hold off;
-        spikes{j} = sp;
+        SpikeWf{episode} = sp;
 
-        title(sprintf('Episode #%d', j));
-        axis([t(1) t(end) analysisParams.io.yaxis]);
+        title(sprintf('Episode #%d', episode));
+        axis([spiketVec(1) spiketVec(end) dataAnalysisParams.io.yaxis]);
     end
 end
 linkaxes(ax,'xy');
@@ -244,14 +249,14 @@ l_text = {};
 % Plot the spike amplitudes
 subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
 max_peaks = -1;
-for j = 1:hdr.lActualEpisodes
+for episode = 1:hdr.lActualEpisodes
     hold on;
-    if ~isempty(Spikes.pks{j})
+    if ~isempty(FoundSpikes.pks{episode})
         ccount = ccount + 1;
-        plot(Spikes.pks{j}, 'Color',cmap(ccount,:));
-        l_text{ccount} = sprintf('%d',j);
-        if length(Spikes.pks{j}) > max_peaks
-            max_peaks = length(Spikes.pks{j});
+        plot(FoundSpikes.pks{episode}, 'Color',cmap(ccount,:));
+        l_text{ccount} = sprintf('%d',episode);
+        if length(FoundSpikes.pks{episode}) > max_peaks
+            max_peaks = length(FoundSpikes.pks{episode});
         end
     end 
 end
@@ -265,19 +270,19 @@ end
 set(gca, 'FontSize', 6);
 
 %-------------------------- SUMMARY NUMBERS -----------------------------%
-if  prod(double(cellfun('isempty', Spikes.pks))) == 1
+if  prod(double(cellfun('isempty', FoundSpikes.pks))) == 1
     display('NO spikes detected for this cell...no summary stats')
     return;
 end
 
-R.spikes = spikes;
-R.S = Spikes;
+R.spikes = SpikeWf;
+R.S = FoundSpikes;
 R.mp = mp;
 
 [F, ~, ~] = collect_features(R);
 
 feat{1} = F;
-[all_features] = collapse_feature(feat, analysisParams.io.features, analysisParams.io.normalize);
+[all_features] = collapse_feature(feat, dataAnalysisParams.io.features, dataAnalysisParams.io.normalize);
 
 %----------------------- Export the plots -------------------------------%
 global FIGURE_DIR;
@@ -300,14 +305,20 @@ warning('off');
 for j=1:nepochs
     ts = squeeze(data(:,j));
     [Spikes.pks{j},Spikes.locs{j}] = findpeaks(ts, 'MINPEAKHEIGHT', analysisParams.io.minpeakheight);
+    
+    %check if spikes are within current injection period
     ind = find(tvec(Spikes.locs{j}) > analysisParams.io.pulsestart  & tvec(Spikes.locs{j}) < (analysisParams.io.pulsestart+analysisParams.io.pulsedur));
+    
     if ~isempty(ind)
         Spikes.pks{j} = Spikes.pks{j}(ind);
         Spikes.locs{j} = Spikes.locs{j}(ind);
+        Spikes.num{j} = length(ind);
     else
         Spikes.pks{j} = [];
         Spikes.locs{j} = [];
+        Spikes.num = 0;
     end
+    
 end
 
 warning('on');
