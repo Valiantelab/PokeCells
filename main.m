@@ -11,12 +11,17 @@ excelName = 'sampleIO';
 
 [~, ap] = excel_read(strcat(DATA_DIR, '\Total5\'), excelName);
 
-for i = 1:length(ap)
-    ap(i).io.pulsestart = 160;
-    ap(i).io.pulsedur = 600;
-    ap(i).io.pampstart = -400;
-    ap(i).io.pampstep = 50;
+numCells = length(ap);
+for i = 1:numCells
+    ap(i).io.pulsestartIdeal = 160; %you overwrite this anyways!!
+    ap(i).io.pulsestart = ap(i).io.pulsestartIdeal; %you overwrite this anyways!!
+    ap(i).io.pulsedurIdeal = 600;
+    ap(i).io.pulsedur = ap(i).io.pulsedurIdeal;
+    ap(i).io.pampstartIdeal = -400;
+    ap(i).io.pampstepIdeal = 50;
 end
 
-sliceIO(ap(1)); % There will be three for three different slices
+%data is acquired as t x 2chan x episodes
+
+sliceIO(ap(2)); % There will be three for three different slices
 

@@ -20,7 +20,7 @@ analysisParams.ch = 1;              % Channel to analyze
 
 % Important that this is an integer divider of the original sampling rate
 analysisParams.resample = false;
-analysisParams.srate = 2500;        % Sampling rate to decimate data to
+analysisParams.srate = 2500;        % Sampling rate to decimate data to - (why?)
 
 % Factor by which to oversample the data - thus is ap.srate = 5000, the low
 % pass filter will be set to 1000;

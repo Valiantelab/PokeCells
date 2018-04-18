@@ -1,4 +1,4 @@
-function [ss, ap] = excel_read(Dir, fname)
+function [ss, analysisParams] = excel_read(Dir, fName)
 
 % Function to read in a excel spreadsheet and parse the data out of it.
 % The filename field must be specified to be a text column or this will not
@@ -14,7 +14,7 @@ function [ss, ap] = excel_read(Dir, fname)
 
 sf_names = {'Comment', 'ExportDir', 'Tags', 'GroupInc'};
 
-full_path = fullfile(Dir,[fname '.xlsx']);
+full_path = fullfile(Dir,[fName '.xlsx']);
 
 if ~exist(full_path, 'file')
     display(full_path);
@@ -24,7 +24,7 @@ end
 %% Load the files and their condtions etc etc
 
 % Read in SHEET 1
-display(sprintf('EXCEL_READ: Opening %s',fullfile(Dir, fname)));
+display(sprintf('EXCEL_READ: Opening %s',fullfile(Dir, fName)));
 [ss.num, ss.txt, ss.raw] = xlsread(full_path, 1);
 
 % Read in SHEET 2 - channel assignments
@@ -59,31 +59,31 @@ if max(cellfun(@isempty,  {ss.txt{2:end,2}})) == 1
 end
 
 for i=1:nfiles
-    ap(i) = setAnalysisParams();
-    ap(i).Dir = ss.txt{i+1,1};
-    ap(i).fname = ss.txt{i+1,2};
-    ap(i).cond.names = {};
+    analysisParams(i) = setAnalysisParams();
+    analysisParams(i).Dir = ss.txt{i+1,1};
+    analysisParams(i).fname = ss.txt{i+1,2};
+    analysisParams(i).cond.names = {};
     
     for j=1:ncond
         t_limits = ss.num(i,(3*j-2):(3*j-1));
-        ap(i).cond.times(:,j) = t_limits;
-        ap(i).cond.names{j} = cond_names{j};
-        ap(i).cond.fname{j} = ss.txt{i+1,3*j-1}(1:end-1);
+        analysisParams(i).cond.times(:,j) = t_limits;
+        analysisParams(i).cond.names{j} = cond_names{j};
+        analysisParams(i).cond.fname{j} = ss.txt{i+1,3*j-1}(1:end-1);
     end
     
     % Get the special fields
     c = 0;
-    ap(i).sf.names = [];  % Clear the names
+    analysisParams(i).sf.names = [];  % Clear the names
     for j=1:nsf
         if sf_index(j)
             c = c + 1;
-            ap(i).sf.names{c} = sf_names{j};
-            ap(i).sf.vals{c} = ss.txt{i+1,sf_index(j)};
+            analysisParams(i).sf.names{c} = sf_names{j};
+            analysisParams(i).sf.vals{c} = ss.txt{i+1,sf_index(j)};
         end
     end
     % Set the channel to analyze which must be just after the condition
     % timings
-    ap(i).ch = ss.num(i,3*ncond);
+    analysisParams(i).ch = ss.num(i,3*ncond);
     
     % Get the channel labels from the table.  If there are multiple files
     % for the same slice it is assumed that the channel assigments did not
@@ -93,11 +93,11 @@ for i=1:nfiles
         chfnames{l} = ch.txt{l+1,1}(1:end-1);
     end
     
-    rindex = find_text(chfnames, ap(i).cond.fname{1});
+    rindex = find_text(chfnames, analysisParams(i).cond.fname{1});
     if ~rindex
-        display(sprintf('%s has no channel assigment.', ap(i).cond.fname{1}));
+        display(sprintf('%s has no channel assigment.', analysisParams(i).cond.fname{1}));
     else
-        ap(i).chlabels = {ch.txt{rindex+1,2:end}};
+        analysisParams(i).chlabels = {ch.txt{rindex+1,2:end}};
     end
         
 end

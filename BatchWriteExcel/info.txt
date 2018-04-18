@@ -1,0 +1,8 @@
+-----------------BatchWriteExcel-----------------
+////////////////Saima S. Ali 2018////////////////
+
+Batch write the excel files based on all filenames in a folder...
+Given a list of folders, fill out an excel sheet with the right headings indicating basic file locations and names
+
+This is only useful if there are few settings to be modified!
+To be used for input to PokeCells Lib

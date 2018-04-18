@@ -17,9 +17,13 @@ function [R] = sliceIO(dataAnalysisParams, doSave)
 global DATA_DIR;
 
 if nargin < 3; doSave = false; end
+
+dataChannel = dataAnalysisParams.io.ch_to_analyze;
+fn = dataAnalysisParams.fname(1:end-1); % FileName
+
+
 %if nargin < 2; 
 %analysisParams = setAnalysisParams; end
-fn = dataAnalysisParams.fname(1:end-1); % FileName
 
 % Get the data
 % -------------------------------------------------------------
@@ -32,6 +36,7 @@ if ~exist(fpath, 'file')
 end
 
 [data,sampInterval,hdr]=abfload(fpath); % Load the data
+numEpisodes = hdr.lActualEpisodes;
 
 if hdr.nOperationMode ~= 5
     % Means that data were acquired in some other mode than that required
@@ -41,10 +46,10 @@ end
 
 %------------Compute a few constants -----------------------%
 
-[npoints, nchan, nepochs] = size(data);
-hdr.lNumSamplesPerEpisode = npoints;
-hdr.nADCNumChannels = nchan;
-hdr.lActualEpisodes = nepochs;
+[nPoints, nChannels, nEpochs] = size(data);
+hdr.lNumSamplesPerEpisode = nPoints;
+hdr.nADCNumChannels = nChannels;
+hdr.lActualEpisodes = nEpochs; %episodes
 dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur;
 
 sampRate = 1/(sampInterval*1e-6); % convert sample interval to frequency
@@ -63,8 +68,8 @@ figs = [];
 
 % Plot the raw data -----------------------------------------------------
 [fcount, figs] = figure_set(fcount, figs, [upper(fn) '-Raw Data']);
-for i=1:hdr.nADCNumChannels
-    subplot(hdr.nADCNumChannels, 1, i)
+for i=1:nChannels
+    subplot(nChannels, 1, i)
     D = squeeze(data(:,i,:));
     plot(tvec,D(:,[1 end]));
     xlabel('Time(ms)');
@@ -75,7 +80,7 @@ end
 
 % Create the waveform if none exists ---------------------------------
 
-if hdr.nADCNumChannels == 1
+if nChannels == 1
     %number of channels
     I = waveform_create(dataAnalysisParams, tvec, size(data,3));
     V = squeeze(data(:,1,:));
@@ -129,6 +134,61 @@ axes_text_style();
 xlabel('pA');
 ylabel('mV');
 
+%Rebound Spiking --------------------------
+
+ReboundSpikes = getReboundSpikes(data(wfend:end, dataChannel, :), dataAnalysisParams);
+R.ReboundSpikes = ReboundSpikes;
+
+%AHP calculation --------------------------
+pampend = dataAnalysisParams.io.pampstartIdeal + dataAnalysisParams.io.pampstepIdeal * (numEpisodes - 1); 
+dataAnalysisParams.io.idealI = dataAnalysisParams.io.pampstartIdeal:dataAnalysisParams.io.pampstepIdeal:pampend; %store the set I values
+idealI = dataAnalysisParams.io.idealI;
+posI = idealI(idealI>0);
+negI = idealI(idealI<0);
+restingPotential = mp.resting;
+plottingWindow = 500;
+
+ahpFigHandle = figure;
+title('AHP');
+
+reboundFigHandle = figure;
+title('Rebound');
+
+adpFigHandle = figure;
+title('ADP');
+
+R.ahp = {};
+for episode = 1:numEpisodes
+    % use wf end to find AHP
+    %plot(plottingWindow, mp.resting, 'kx', 'markerSize', 12);
+    
+    if (ReboundSpikes.num{episode})
+        disp('------------ Rebound spikes, no AHP ------------');
+        figure(reboundFigHandle);
+        hold on;
+        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
+        plot(data(:, dataChannel, episode));
+        hold off;
+        %R.ahp{episode} = {};
+    elseif (idealI(episode) > 0) % no rebound spiking, and depolarizing current - do AHP stuff
+        disp('------------ No rebound spikes, computing AHP ------------');
+        figure(ahpFigHandle);
+        hold on;
+        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
+        plot(data(:, dataChannel, episode))
+        hold off;
+        %R.ahp{episode} = findAHP();
+    elseif (idealI(episode) < 0)
+        disp('------------Hyperpolarizing Current------------');
+        %----Can compute ADP----%
+        figure(adpFigHandle);
+        hold on;
+        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
+        plot(data(:, dataChannel, episode))
+        hold off;
+    end
+end
+
 %----------------- Spike analysis ---------------------------------------%
 
 % Find all the spikes
@@ -140,15 +200,15 @@ FoundSpikes.tvec = tvec;
 FoundSpikes.hdr = hdr;
 
 % Get plot layout
-[r, c] = rc_plot(hdr.lActualEpisodes+1);
+[r, c] = rc_plot(numEpisodes+1);
 
 % Maybe at some point 2 cells (or more) will be recorded from??
 cmap = colormap(lines);
 
-ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), dataAnalysisParams.io.ch_to_analyze);
+ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), dataChannel);
 [fcount, figs] = figure_set(fcount, figs, ftext);
 
-for episode = 1:hdr.lActualEpisodes
+for episode = 1:numEpisodes
     ax(episode) = subplot(r,c,episode);
     plot(tvec,V(:,episode));
     xlabel('Time(ms)', 'FontSize', 6);
@@ -178,8 +238,8 @@ FoundSpikes.lv = lv;
 ccount = 0;
 l_text = {};
 % Plot the ISI as a function of spike number
-subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
-for episode = 1:hdr.lActualEpisodes
+subplot(r,c,[numEpisodes+1 r*c]);
+for episode = 1:numEpisodes
     hold on;
     if ~(FoundSpikes.num{episode}< dataAnalysisParams.io.minspikes) && (min(tvec(FoundSpikes.locs{episode}))< dataAnalysisParams.io.maxT)
     %if ~(length(FoundSpikes.locs{episode}) < dataAnalysisParams.io.minspikes) && (min(tvec(FoundSpikes.locs{episode}))< dataAnalysisParams.io.maxT)
@@ -213,7 +273,7 @@ ftext = sprintf('%s - ISI Channel # %d',upper(fn), vchan);
 [~, figs] = figure_set(fcount, figs, ftext);
 
 SpikeWf = {};
-for episode = 1:hdr.lActualEpisodes
+for episode = 1:numEpisodes
     ax(episode) = subplot(r,c,episode);
     set(gca, 'FontSize', 6);
     %if ~isempty(length(FoundSpikes.locs{j}))
@@ -225,7 +285,7 @@ for episode = 1:hdr.lActualEpisodes
                 sp_count = sp_count +1;
                 startIndex = FoundSpikes.locs{episode}(spikeIndex)-spikeWindow;
                 endIndex = FoundSpikes.locs{episode}(spikeIndex)+spikeWindow;
-                SpikeWf{episode} = data(startIndex:endIndex, dataAnalysisParams.io.ch_to_analyze, episode)';
+                SpikeWf{episode} = data(startIndex:endIndex, dataChannel, episode)';
                 
                 % Display the first x spikes 
                 if (sp_count <= dataAnalysisParams.io.firstspikestodisp)
@@ -248,9 +308,9 @@ linkaxes(ax,'xy');
 ccount = 0;
 l_text = {};
 % Plot the spike amplitudes
-subplot(r,c,[hdr.lActualEpisodes+1 r*c]);
+subplot(r,c,[numEpisodes+1 r*c]);
 max_peaks = -1;
-for episode = 1:hdr.lActualEpisodes
+for episode = 1:numEpisodes
     hold on;
     if ~isempty(FoundSpikes.pks{episode})
         ccount = ccount + 1;
