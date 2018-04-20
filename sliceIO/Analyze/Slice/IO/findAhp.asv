@@ -8,8 +8,7 @@ ahp.auc = {};
 ahp.min = {};
 numPoints = size(V, 1);
 
-%baselineRange = 1:analysisParams.io.pulsestart*1e-3*sampRate; %differed
-%from post current injection bline
+baselineRange = 1:analysisParams.io.pulsestart*1e-3*sampRate;
 
 baselineVec = ones(1, numPoints);
 
@@ -51,12 +50,10 @@ end
 %found the range of ahp, ahpStart:ahpEnd
 %integrate using trapz
 
-centeredV = V - restingPotential; %want the area wrt baseline
-movingAvV = movmean(V(ahpStart:ahpEnd), windowSize); %compute a moving average to find minimum
-%can get standard deviation for this too
-
+centeredV = V - restingPotential;
+movingAvV = movmean(V, windowSize)
 ahp.auc = {trapz(tvec(ahpStart:ahpEnd), centeredV(ahpStart:ahpEnd))};
-ahp.min = {min(movingAvV)};
+ahp.min = {};
     
 
 % plotting

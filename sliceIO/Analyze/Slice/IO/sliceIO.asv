@@ -16,6 +16,7 @@ function [R] = sliceIO(dataAnalysisParams, doSave)
 
 global DATA_DIR;
 
+oneChannel = {};
 
 if nargin < 3; doSave = false; end
 
@@ -83,19 +84,14 @@ end
 
 if nChannels == 1
     %%%------------ Let's ignore it for now ------------%%%
-    disp('Only one channel!');
-    disp(fpath);
-    return
+    no_current_injection = 
     %number of channels
     I = waveform_create(dataAnalysisParams, tvec, size(data,3));
     V = squeeze(data(:,1,:));
 else
     % Get voltage channel and current channel in spreadsheet otherwise just
     % default
-    disp('Two channels loaded')
-    disp(fpath);
     
-    %%--Remove this?--%%
     vchan = find_text(dataAnalysisParams.chlabels, 'V');
     ichan = find_text(dataAnalysisParams.chlabels, 'I');
     if isempty(vchan) || isempty(ichan)
@@ -119,7 +115,7 @@ else
     dataAnalysisParams.io.pampstart = min(steps);
 end
 
-V = V + vOffset; % V contains all the voltage traces from all episodes..
+V = V + vOffset;
 
 % Plot the waveform -----------------------------------------------------
 [fcount, figs] = figure_set(fcount, figs, [upper(fn) ' Waveform']);
@@ -141,6 +137,65 @@ title(sprintf('Resistance = %4.0f MOhm Rmp = %4.0fmV', mp.b(2)*1e3, mp.b(1)));
 axes_text_style();
 xlabel('pA');
 ylabel('mV');
+
+%Rebound Spiking --------------------------
+
+ReboundSpikes = getReboundSpikes(data(wfend:end, dataChannel, :), dataAnalysisParams); %on all episodes
+R.ReboundSpikes = ReboundSpikes;
+
+%AHP calculation --------------------------
+%computing which currents are hyperpol and which are depol
+pampend = dataAnalysisParams.io.pampstartIdeal + dataAnalysisParams.io.pampstepIdeal * (numEpisodes - 1); 
+dataAnalysisParams.io.idealI = dataAnalysisParams.io.pampstartIdeal:dataAnalysisParams.io.pampstepIdeal:pampend; %store the set I values
+
+idealI = dataAnalysisParams.io.idealI;
+posI = idealI(idealI>0);
+negI = idealI(idealI<0);
+
+%restingPotential = mp.resting; %this is average over all trials... let's
+%compute it individually instead
+plottingWindow = 500;
+
+ahpFigHandle = figure;
+title('AHP');
+
+reboundFigHandle = figure;
+title('Rebound');
+
+adpFigHandle = figure;
+title('ADP');
+
+R.ahp = {};
+for episode = 1:numEpisodes
+    % use wf end to find AHP
+    %plot(plottingWindow, mp.resting, 'kx', 'markerSize', 12);
+    
+    if (ReboundSpikes.num{episode})
+        disp('------------ Rebound spikes, no AHP ------------');
+        figure(reboundFigHandle);
+        hold on;
+        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
+        plot(data(:, dataChannel, episode));
+        hold off;
+        %R.ahp{episode} = {};
+    elseif (idealI(episode) > 0) % no rebound spiking, and depolarizing current - do AHP stuff
+        disp('------------ No rebound spikes, computing AHP ------------');
+        figure(ahpFigHandle);
+        hold on;
+        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
+        plot(data(:, dataChannel, episode))
+        hold off;
+        R.ahp{episode} = findAHP(data(wfend:end, dataChannel, episode), tvec, dataAnalysisParams);
+    elseif (idealI(episode) < 0)
+        disp('------------Hyperpolarizing Current------------');
+        %----Can compute ADP----%
+        figure(adpFigHandle);
+        hold on;
+        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
+        plot(data(:, dataChannel, episode))
+        hold off;
+    end
+end
 
 %----------------- Spike analysis ---------------------------------------%
 
@@ -306,69 +361,6 @@ if ~isempty(FIGURE_DIR)
 else
     disp('No figure directory specified to export to.');
 end
-
-
-
-%Rebound Spiking --------------------------
-
-ReboundSpikes = getReboundSpikes(data(wfend:end, dataChannel, :), dataAnalysisParams); %on all episodes
-R.ReboundSpikes = ReboundSpikes;
-
-%AHP calculation --------------------------
-%computing which currents are hyperpol and which are depol
-pampend = dataAnalysisParams.io.pampstartIdeal + dataAnalysisParams.io.pampstepIdeal * (numEpisodes - 1); 
-dataAnalysisParams.io.idealI = dataAnalysisParams.io.pampstartIdeal:dataAnalysisParams.io.pampstepIdeal:pampend; %store the set I values
-
-idealI = dataAnalysisParams.io.idealI;
-posI = idealI(idealI>0);
-negI = idealI(idealI<0);
-
-%restingPotential = mp.resting; %this is average over all trials... let's
-%compute it individually instead
-plottingWindow = 500;
-
-ahpFigHandle = figure;
-title('AHP');
-
-reboundFigHandle = figure;
-title('Rebound');
-
-adpFigHandle = figure;
-title('ADP');
-
-R.ahp = {};
-for episode = 1:numEpisodes
-    % use wf end to find AHP
-    %plot(plottingWindow, mp.resting, 'kx', 'markerSize', 12);
-    
-    if (ReboundSpikes.num{episode})
-        disp('------------ Rebound spikes, no AHP ------------');
-        figure(reboundFigHandle);
-        hold on;
-        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
-        plot(data(:, dataChannel, episode));
-        hold off;
-        R.ahp{episode} = {};
-    elseif (idealI(episode) > 0) % no rebound spiking, and depolarizing current - do AHP stuff
-        disp('------------ No rebound spikes, computing AHP ------------');
-        figure(ahpFigHandle);
-        hold on;
-        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
-        plot(data(:, dataChannel, episode))
-        hold off;
-        R.ahp{episode} = findAhp(V(:, episode), tvec, dataAnalysisParams, wfend, sampRate, episode);
-    elseif (idealI(episode) < 0)
-        disp('------------Hyperpolarizing Current------------');
-        %----Can compute ADP----%
-        figure(adpFigHandle);
-        hold on;
-        %plot(data(wfend-plottingWindow:end, dataChannel, episode));
-        plot(data(:, dataChannel, episode))
-        hold off;
-        R.ahp{episode} = {};
-    end
-end
-
 %---------------------   OTHER FUNCTIONS --------------------------------%
 
       

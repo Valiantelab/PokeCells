@@ -3,25 +3,30 @@ clear all;
 close all;
 
 global DATA_DIR;
-DATA_DIR = 'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\';
+DATA_DIR = 'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\AHP\';
+CODE_DIR =  'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\';
+addpath(genpath(CODE_DIR));
 
-addpath(genpath(DATA_DIR));
+excelName = 'AHP';
 
-excelName = 'sampleIO';
-
-[~, ap] = excel_read(strcat(DATA_DIR, '\Total5\'), excelName);
+[~, ap] = excel_read(DATA_DIR, excelName);
 
 numCells = length(ap);
 for i = 1:numCells
-    ap(i).io.pulsestartIdeal = 160; %you overwrite this anyways!!
-    ap(i).io.pulsestart = ap(i).io.pulsestartIdeal; %you overwrite this anyways!!
+    %this is a bandaid solution that I've applied
+    %need a cure
     ap(i).io.pulsedurIdeal = 600;
-    ap(i).io.pulsedur = ap(i).io.pulsedurIdeal;
     ap(i).io.pampstartIdeal = -400;
     ap(i).io.pampstepIdeal = 50;
+    ap(i).io.pulsestartIdeal = 160; 
+    
+    ap(i).io.pulsestart = ap(i).io.pulsestartIdeal; 
+    ap(i).io.pulsedur = ap(i).io.pulsedurIdeal;
+    ap(i).io.pampstart = ap(i).io.pampstartIdeal;
+    ap(i).io.pampstep = ap(i).io.pampstepIdeal;
 end
 
 %data is acquired as t x 2chan x episodes
-
-sliceIO(ap(2)); % There will be three for three different slices
-
+for i = 7:7
+    sliceIO(ap(i)); % There will be three for three different slices
+end
