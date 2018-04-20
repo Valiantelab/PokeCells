@@ -4,6 +4,7 @@
 Specify a list of folders to generate an excel file for.
 Can only set block settings; i.e., replicate the same static settings for all files.
 Good for filling out filenames and directory information so that it does not have to be done manually.
+To be used for input to PokeCells Lib
 
 Steps:
 	1. Right-click on make_excel.py -> Edit with IDLE
@@ -14,6 +15,5 @@ Steps:
 	5. Specify "excel_name" for the name of the excel file, with extension type .csv (comma separated format)
 		Use a datestamp to keep track, and use clear file names!!
 	6. Open the generated file in Excel. You should find it in the same place as the python script.
-
-
-To be used for input to PokeCells Lib
+`	7. Save as '.xlsx' file format
+	8. Done! You can use it in the MATLAB script.

@@ -33,7 +33,7 @@ if __name__ == "__main__":
     '''
 
     #------------ FROM HERE BELOW, DO NOT CHANGE ANYTHING!!! ------
-    headings = ['Dir', 'Offset', 'Offset', 'AnChan', 'Comment', 'ExportDir', 'Tags', 'GroupInc']
+    headings = ['Dir', blank, 'Offset', 'Offset', 'AnChan', 'Comment', 'ExportDir', 'Tags', 'GroupInc']
     static_settings = [offset, offset, anchan, comment, export_dir, tags, groupinc]
 
     comma = ','
