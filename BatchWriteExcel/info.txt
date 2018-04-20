@@ -1,8 +1,19 @@
 -----------------BatchWriteExcel-----------------
 ////////////////Saima S. Ali 2018////////////////
 
-Batch write the excel files based on all filenames in a folder...
-Given a list of folders, fill out an excel sheet with the right headings indicating basic file locations and names
+Specify a list of folders to generate an excel file for.
+Can only set block settings; i.e., replicate the same static settings for all files.
+Good for filling out filenames and directory information so that it does not have to be done manually.
 
-This is only useful if there are few settings to be modified!
+Steps:
+	1. Right-click on make_excel.py -> Edit with IDLE
+	2. Set the data directory "data_dir" - make sure to use two backslashes instead of one
+	3. Specify the list of folders "folder_list" to generate the excel file for. This is CAsE sEnSITivE!!
+		Make sure that the folders directly contain data, not nested subfolders
+	4. Specify heading settings: ExportDir, Offset, AnChan, Tags, GroupInc, Comments...
+	5. Specify "excel_name" for the name of the excel file, with extension type .csv (comma separated format)
+		Use a datestamp to keep track, and use clear file names!!
+	6. Open the generated file in Excel. You should find it in the same place as the python script.
+
+
 To be used for input to PokeCells Lib
