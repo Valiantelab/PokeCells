@@ -38,7 +38,10 @@ end
 
 [data,sampInterval,hdr]=abfload(fpath); % Load the data
 numEpisodes = hdr.lActualEpisodes;
-
+if numEpisodes >= 40
+    disp('Some other protocol')
+    return
+end
 if hdr.nOperationMode ~= 5
     % Means that data were acquired in some other mode than that required
     % for I/O
@@ -83,12 +86,14 @@ end
 
 if nChannels == 1
     %%%------------ Let's ignore it for now ------------%%%
-    disp('Only one channel!');
-    disp(fpath);
-    return
+    %disp('Only one channel!');
+    %disp(fpath);
+    %return
     %number of channels
     I = waveform_create(dataAnalysisParams, tvec, size(data,3));
     V = squeeze(data(:,1,:));
+    vchan = 1;
+    wfend = (dataAnalysisParams.io.pulsestart + 1.01*dataAnalysisParams.io.pulsedur)*sampRate/1000; % pulse timings in millis
 else
     % Get voltage channel and current channel in spreadsheet otherwise just
     % default
@@ -161,6 +166,7 @@ cmap = colormap(lines);
 ftext = sprintf('%s-SPIKES Channel # %d',upper(fn), dataChannel);
 [fcount, figs] = figure_set(fcount, figs, ftext);
 
+R.numEpisodes = {numEpisodes};
 for episode = 1:numEpisodes
     ax(episode) = subplot(r,c,episode);
     plot(tvec,V(:,episode));
@@ -310,6 +316,7 @@ end
 
 
 %Rebound Spiking --------------------------
+close all;
 
 ReboundSpikes = getReboundSpikes(data(wfend:end, dataChannel, :), dataAnalysisParams); %on all episodes
 R.ReboundSpikes = ReboundSpikes;
@@ -340,17 +347,20 @@ R.ahp = {};
 for episode = 1:numEpisodes
     % use wf end to find AHP
     %plot(plottingWindow, mp.resting, 'kx', 'markerSize', 12);
+    %disp('Episode');
+    %disp(episode)
     
     if (ReboundSpikes.num{episode})
-        disp('------------ Rebound spikes, no AHP ------------');
+        %disp('------------ Rebound spikes, no AHP ------------');
         figure(reboundFigHandle);
         hold on;
         %plot(data(wfend-plottingWindow:end, dataChannel, episode));
         plot(data(:, dataChannel, episode));
         hold off;
-        R.ahp{episode} = {};
+        R.ahp{episode}.auc = {};
+        R.ahp{episode}.min = {};
     elseif (idealI(episode) > 0) % no rebound spiking, and depolarizing current - do AHP stuff
-        disp('------------ No rebound spikes, computing AHP ------------');
+        %disp('------------ No rebound spikes, computing AHP ------------');
         figure(ahpFigHandle);
         hold on;
         %plot(data(wfend-plottingWindow:end, dataChannel, episode));
@@ -358,16 +368,23 @@ for episode = 1:numEpisodes
         hold off;
         R.ahp{episode} = findAhp(V(:, episode), tvec, dataAnalysisParams, wfend, sampRate, episode);
     elseif (idealI(episode) < 0)
-        disp('------------Hyperpolarizing Current------------');
+        %disp('------------Hyperpolarizing Current------------');
         %----Can compute ADP----%
         figure(adpFigHandle);
         hold on;
         %plot(data(wfend-plottingWindow:end, dataChannel, episode));
         plot(data(:, dataChannel, episode))
         hold off;
-        R.ahp{episode} = {};
+        R.ahp{episode}.auc = {};
+        R.ahp{episode}.min = {};
+    else
+        R.ahp{episode}.auc = {};
+        R.ahp{episode}.min = {};
+        % 0 pA
     end
 end
+
+
 
 %---------------------   OTHER FUNCTIONS --------------------------------%
 
