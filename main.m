@@ -1,34 +1,38 @@
-% todo: 1) Check for onechannel setting DONE
-%       2) Check current levels (different conditions) DONE
-%       3) Print to Excel
+% Part 1: AHP for layer2/3 comparison
+% Part 2: Active & Passive properties DC injection
+% Part 3: Ramp
 
+%% Part 1: Load in all of the data
 clc;
 clear all; 
 close all;
 
 global DATA_DIR;
-DATA_DIR = 'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\AHP\';
+DATA_DIR = 'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\AHPMay7\';
 CODE_DIR =  'C:\Users\Saima\Documents\REL Projects\Homeira Heterogeneity\';
 addpath(genpath(CODE_DIR));
 
-excelName = 'AHP';
+excelName = 'AHP05102018';
 
 [~, ap] = excel_read(DATA_DIR, excelName);
 
 numCells = length(ap);
 for i = 1:numCells
-    if strcmp(ap(i).Dir, 'Total_5_Homeira') || strcmp(ap(i).Dir, 'Total2Homeira')
+    if strcmp(ap(i).Dir, 'Total_5_Homeira')
         %Homeira's protocol
-        disp('---- Homeira Protocol ----')
+        %disp('---- Homeira Protocol ----')
         ap(i).io.pampstartIdeal = -400;
         ap(i).io.pampstepIdeal = 50;
         
         ap(i).io.pulsestartIdeal = 160; 
         ap(i).io.pulsedurIdeal = 600;
-        %13o21027 - 11th cell, different start and duration
+
+    %elseif strcmp(ap(i).Dir, 'Total2Homeira')
+     %   continue
+        %too many different protocols...
     elseif strcmp(ap(i).Dir, 'TotaL_5_Lihua') || strcmp(ap(i).Dir, 'Total2lihua')
         %Lihua
-        disp('---- Lihua Protocol ----')
+        %disp('---- Lihua Protocol ----')
         ap(i).io.pampstartIdeal = -400;
         ap(i).io.pampstepIdeal = 25;
         
@@ -50,22 +54,69 @@ end
 %data is acquired as t x 2chan x episodes
 
 close all;
-%skip = [];
-for i = 11:numCells
- %   if isempty(find(skip == i, 1))
-        disp('Now analyzing slice..')
-        disp(i)
+badCell = zeros(1, numCells);
+startCell = 154;
+numPruned = 18;
 
-        io(i) = sliceIO(ap(i));
-        hold = input('Take a look at stuff, then press enter'); 
-        close all;
-  %  end
+for i = startCell:numCells
+    disp('Now analyzing slice..')
+    disp(i)
+
+    io(i-numPruned) = sliceIO(ap(i));
+%     hold = input('Is everything good? Blank for YES, anything else for no');
+%     
+%     if ~strcmp(hold, '')
+%         badCell(i) = 1;
+%     end
+%     
+    close all;
 end
 
 %% Print to excel file
+% AHP only
 xlrow = 1; %track which row we are on
 
-outputxlname = 'AHP_values.xlsx';
+outputxlname = 'AHPvalues05102018_R4.xlsx';
+
+xltgt =  strcat('A', num2str(xlrow));
+    
+headings = {'Data Dir', 'File name', 'Layer', 'Current injection (pA)', 'AHP AUC (ms * mV)', 'AHP min (mV)', 'Cell#', 'Episode#'};
+xlswrite(outputxlname, headings, 1, xltgt);
+
+numCells = length(io);
+for i = 1:numCells
+    currStart = ap(i).io.pampstartIdeal;
+    currStep = ap(i).io.pampstepIdeal;
+    currEnd = currStart + currStep * (io(i).numEpisodes{1} - 1);
+    
+    currLevels = currStart:currStep:currEnd;
+    
+    if length(currLevels) ~= io(i).numEpisodes{1}
+        error('You messed up!!!1!!1! >:) ')
+    end
+    if strcmp(ap(i).Dir, 'Total_5_Homeira') || strcmp(ap(i).Dir, 'TotaL_5_Lihua')
+        layer = 5;
+    elseif  strcmp(ap(i).Dir, 'Total2Homeira') || strcmp(ap(i).Dir, 'Total2lihua')
+        layer = 2;
+    end
+    
+    for j = 1:io(i).numEpisodes{1}
+        if ~isempty(io(i).ahp{j}.auc)
+            xlrow = xlrow + 1;
+            dataArr = { ap(i).Dir,  ap(i).fname, layer, currLevels(j), io(i).ahp{j}.auc{1}, io(i).ahp{j}.min{1}, i, j};
+        %else
+        %    dataArr = { ap(i).Dir,  ap(i).fname, layer, currLevels(j), 'None', 'None', i, j};
+        
+            xltgt =  strcat('A', num2str(xlrow));
+            xlswrite(outputxlname, dataArr, 1, xltgt);
+        end
+    end
+    disp(i)
+end
+%% Print to excel file - active and passive props
+xlrow = 1; %track which row we are on
+
+outputxlname = 'ActivePassiveProps.xlsx';
 
 xltgt =  strcat('A', num2str(xlrow));
     

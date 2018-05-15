@@ -1,0 +1,9 @@
+Dir, ,Offset,Offset,AnChan,Comment,ExportDir,Tags,GroupInc
+Case1\Ramp,18320001f,0,0,2, ,ExportDir,None,yes
+Case1\Ramp,18320013f,0,0,2, ,ExportDir,None,yes
+Case1\Ramp,18320019f,0,0,2, ,ExportDir,None,yes
+Case2\Ramp,18320000f,0,0,2, ,ExportDir,None,yes
+Case2\Ramp,18320012f,0,0,2, ,ExportDir,None,yes
+Case2\Ramp,18320016f,0,0,2, ,ExportDir,None,yes
+Case2\Ramp,18320024f,0,0,2, ,ExportDir,None,yes
+Case2\Ramp,18320030f,0,0,2, ,ExportDir,None,yes

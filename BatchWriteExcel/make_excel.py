@@ -5,14 +5,14 @@ if __name__ == "__main__":
     print('Please refer to info.txt for instructions and tips')
     
     # ----------- MAIN DATA DIRECTORY ---------
-    data_dir = 'C:\\Users\\Saima\\Documents\\REL Projects\\Homeira Heterogeneity\\AHP\\'
+    data_dir = 'C:\\Users\\Saima\\Documents\\REL Projects\\Homeira Heterogeneity\\C3202018\\'
     #need DOUBLE backslash
 
     #----------- SUBFOLDERS WITH DATA ---------
-    folder_list = ['Total_5_Homeira', 'TotaL_5_Lihua', 'Total2Homeira', 'Total2lihua']
+    folder_list = ['Case1\\Ramp', 'Case2\\Ramp']
 
     #------------ EXCEL FILE NAME ------------
-    excel_name = 'AHP_04182018.csv' #this should be a csv file extension
+    excel_name = 'RAMP05152018.csv' #this should be a csv file extension
     
     #------------ HEADING SETTINGS -----------
     blank = ' ' # can change some fields to blank if needed

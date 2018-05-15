@@ -1,0 +1,184 @@
+function [R] = rampAnalysis(dataAnalysisParams)
+%UNTITLED2 Summary of this function goes here
+%   Detailed explanation goes here
+
+    R = {};
+    global DATA_DIR;
+
+    %dataAnalysisParams.io.pulsestart = ; 
+    %dataAnalysisParams.io.pulsedur = ;
+    
+    dataChannel = dataAnalysisParams.io.ch_to_analyze;
+    fn = dataAnalysisParams.fname(1:end-1); % FileName
+    
+    dpath = getAbsoluteFilePath(DATA_DIR, dataAnalysisParams.Dir);
+    fpath = fullfile(dpath, [fn '.abf']);
+
+    if ~exist(fpath, 'file')
+        disp(fpath);
+        error('File does not exist!');
+    end
+
+    [data,sampInterval,hdr]=abfload(fpath); % Load the data
+    numEpisodes = hdr.lActualEpisodes;
+    if numEpisodes >= 40
+        disp('Some other protocol')
+        return
+    end
+    if hdr.nOperationMode ~= 5
+        % Means that data were acquired in some other mode than that required
+        % for I/O
+        error('Data not acquired in: waveform fixed-length mode');
+    end
+
+    [nPoints, nChannels, nEpochs] = size(data);
+    hdr.lNumSamplesPerEpisode = nPoints;
+    hdr.nADCNumChannels = nChannels;
+    hdr.lActualEpisodes = nEpochs; %episodes
+    %dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur;
+
+    sampRate = 1/(sampInterval*1e-6); % convert sample interval to frequency
+    tvec = (sampInterval*1e-3)*(0:(hdr.lNumSamplesPerEpisode-1)); % Time vector
+
+    % Keep track of the figures for printing
+    fcount = 0;
+    figs = [];
+
+    
+    % Get voltage channel and current channel in spreadsheet otherwise just
+    % default
+    disp('Two channels loaded')
+    disp(fpath);
+    
+    %%--Remove this?--%%
+    vchan = find_text(dataAnalysisParams.chlabels, 'V');
+    ichan = find_text(dataAnalysisParams.chlabels, 'I');
+    if isempty(vchan) || isempty(ichan)
+        vchan = 1;
+        ichan = 2;
+    end
+    
+    V = squeeze(data(:,vchan,:));
+    I = squeeze(data(:,ichan,:));
+        
+    % Timing of current waveform 
+    %[~, wfstart] = max(diff(I(:,end))); % derivative marks onset & offset
+    %use regression to find start
+    
+    wfstart = 1;
+    [~, wfend] = min(diff(I(:,end)));
+%     window = 20;
+%     xmidpoint = floor(2*wfend/3); %this could error out
+%     ymidpoint = mean(I(xmidpoint-window:xmidpoint+window, end));
+        
+    dataAnalysisParams.io.pulsestart = wfstart/sampRate*1000; % when the pulse starts
+    dataAnalysisParams.io.pulsedur = (wfend - wfstart)/sampRate*1000; % when the pulse ends
+    dataAnalysisParams.io.maxT = dataAnalysisParams.io.pulsestart + dataAnalysisParams.io.pulsedur; % end of the paradigm
+    
+    % Plot the raw data -----------------------------------------------------
+    [fcount, figs] = figure_set(fcount, figs, [upper(fn) '-Raw Data']);
+    for i=1:nChannels
+        subplot(nChannels, 1, i)
+        hold on
+        for j = 1:nEpochs
+            plot(tvec,data(:,i, j));
+        end
+        if i == 2
+            plot(tvec(wfstart),I(wfstart,1), 'k*', 'MarkerSize', 10);
+            plot(tvec(wfend), I(wfend,1), 'g+', 'MarkerSize', 10);
+        end
+        D = squeeze(data(:,i,:));
+        xlabel('Time(ms)');
+        ylabel(hdr.recChUnits{i});
+        axis([0 tvec(end) [min(min(D))-10 max(max(D))+10]]);
+        axes_text_style();
+    end
+
+    % Amplitude of the waveform FROM DC PROTOCOL
+%     steps = mean(I(wfstart:wfend,:));
+%     dataAnalysisParams.io.pampstep = mean(diff(steps));
+%     dataAnalysisParams.io.pampstart = min(steps);
+
+    [FoundSpikes] = findSpikes(V, tvec, dataAnalysisParams);
+    FoundSpikes.sampRate = sampRate;
+    FoundSpikes.tvec = tvec;
+    FoundSpikes.hdr = hdr;
+    
+    R.numEpisodes = {numEpisodes};
+    
+    % Get plot layout
+    [r, c] = rc_plot(numEpisodes+1);
+    for episode = 1:numEpisodes
+        ax(episode) = subplot(r,c,episode);
+        plot(tvec,V(:,episode));
+        xlabel('Time(ms)', 'FontSize', 6);
+        ylabel(hdr.recChUnits{vchan}, 'FontSize', 6);
+        axis([0 tvec(end) dataAnalysisParams.io.yaxis]);
+
+        % Plot the peaks
+        if ~isempty(FoundSpikes.pks{episode})   
+            hold on;
+            plot(tvec(FoundSpikes.locs{episode}), FoundSpikes.pks{episode}, '.r', 'LineStyle', 'none');
+            hold off;
+        end
+%         lv(episode) = locVar(tvec, FoundSpikes.locs{episode}, dataAnalysisParams);
+% 
+%         if lv(episode) >= 0
+%             title(sprintf('Lv = %6.4f', lv(episode)));
+%         else
+            title(sprintf('Episode #%d', episode));
+ %       end
+        set(gca, 'FontSize', 6);
+    end
+    linkaxes(ax,'xy');
+
+    % try to exit the spike using a slope method
+    for episode = 1:numEpisodes
+        figure
+        hold on
+        plot(V(:, episode))
+        if ~isempty(FoundSpikes.pks{episode})%this episode spiked
+            %try to find start of the first spkie
+            %first spike info:
+            loc = FoundSpikes.locs{episode}(1);
+            pk = FoundSpikes.pks{episode}(1);
+            
+            zeroCrossing = loc;
+            %back track
+            while V(zeroCrossing, episode) >= 0
+                zeroCrossing = zeroCrossing - 1; %find the point where the signal drops below 0
+            end
+            % found the zero Crossing
+            
+            pkSlope = pk/(loc - zeroCrossing); %ROC of the peak area
+            
+            %start from zero crossing and try to find the exit point
+            %consider peak slope as a multiplier of calm slope
+            
+            window = 10; %10-point window = 1ms
+            upperPoint = zeroCrossing; %start from the zero crossing and work back 
+            lowerPoint = upperPoint - window;
+            winSlope = (V(upperPoint, episode) - V(lowerPoint, episode)) / window; %slope over the window
+            while winSlope > 0.3 * pkSlope
+                upperPoint = upperPoint - floor(window/2);
+                lowerPoint = upperPoint - window;
+                winSlope = (V(upperPoint, episode) - V(lowerPoint, episode)) / window;
+            end
+            
+            %lower point is the start of the spike
+            %take average over 20 points
+            
+            R.threshold = mean(V(lowerPoint-2*window:lowerPoint));
+            R.rheobase = mean(I(lo
+            
+            
+            %now the window has a flattened out slope
+            %find the start of the peak
+%             spikeFree = lowerPoint - 5*window;
+%             noPkSlope = (V(lowerPoint, episode) - V(spikeFree, episode)) / (2*window);
+             plot(lowerPoint, V(lowerPoint, episode), 'r*', 'MarkerSize', 10);
+        end
+    end
+    
+end
+

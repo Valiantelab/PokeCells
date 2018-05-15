@@ -85,11 +85,6 @@ end
 % Create the waveform if none exists ---------------------------------
 
 if nChannels == 1
-    %%%------------ Let's ignore it for now ------------%%%
-    %disp('Only one channel!');
-    %disp(fpath);
-    %return
-    %number of channels
     I = waveform_create(dataAnalysisParams, tvec, size(data,3));
     V = squeeze(data(:,1,:));
     vchan = 1;
@@ -316,7 +311,6 @@ end
 
 
 %Rebound Spiking --------------------------
-close all;
 
 ReboundSpikes = getReboundSpikes(data(wfend:end, dataChannel, :), dataAnalysisParams); %on all episodes
 R.ReboundSpikes = ReboundSpikes;
@@ -330,18 +324,25 @@ idealI = dataAnalysisParams.io.idealI;
 posI = idealI(idealI>0);
 negI = idealI(idealI<0);
 
-%restingPotential = mp.resting; %this is average over all trials... let's
-%compute it individually instead
-plottingWindow = 500;
+close all
 
-ahpFigHandle = figure;
-title('AHP');
+segmentedFig = figure;
+subplot(3, 1, 1);
+xlabel('Rebound');
 
-reboundFigHandle = figure;
-title('Rebound');
+subplot(3, 1, 2);
+xlabel('AHP');
 
-adpFigHandle = figure;
-title('ADP');
+subplot(3, 1, 3);
+xlabel('ADP');
+% ahpFigHandle = figure;
+% title('AHP');
+% 
+% reboundFigHandle = figure;
+% title('Rebound');
+% 
+% adpFigHandle = figure;
+% title('ADP');
 
 R.ahp = {};
 for episode = 1:numEpisodes
@@ -352,7 +353,8 @@ for episode = 1:numEpisodes
     
     if (ReboundSpikes.num{episode})
         %disp('------------ Rebound spikes, no AHP ------------');
-        figure(reboundFigHandle);
+        figure(segmentedFig);
+        subplot(3, 1, 1);
         hold on;
         %plot(data(wfend-plottingWindow:end, dataChannel, episode));
         plot(data(:, dataChannel, episode));
@@ -361,7 +363,8 @@ for episode = 1:numEpisodes
         R.ahp{episode}.min = {};
     elseif (idealI(episode) > 0) % no rebound spiking, and depolarizing current - do AHP stuff
         %disp('------------ No rebound spikes, computing AHP ------------');
-        figure(ahpFigHandle);
+        figure(segmentedFig);
+        subplot(3, 1, 2);
         hold on;
         %plot(data(wfend-plottingWindow:end, dataChannel, episode));
         plot(data(:, dataChannel, episode))
@@ -370,7 +373,8 @@ for episode = 1:numEpisodes
     elseif (idealI(episode) < 0)
         %disp('------------Hyperpolarizing Current------------');
         %----Can compute ADP----%
-        figure(adpFigHandle);
+        figure(segmentedFig);
+        subplot(3, 1, 3);
         hold on;
         %plot(data(wfend-plottingWindow:end, dataChannel, episode));
         plot(data(:, dataChannel, episode))
@@ -388,32 +392,4 @@ end
 
 %---------------------   OTHER FUNCTIONS --------------------------------%
 
-      
-function [Spikes] = findSpikes(data, tvec, analysisParams)
-
-[~, nepochs] = size(data);
-Spikes = [];
-
-warning('off');
-
-for j=1:nepochs
-    ts = squeeze(data(:,j));
-    [Spikes.pks{j},Spikes.locs{j}] = findpeaks(ts, 'MINPEAKHEIGHT', analysisParams.io.minpeakheight);
-    
-    %check if spikes are within current injection period
-    ind = find(tvec(Spikes.locs{j}) > analysisParams.io.pulsestart  & tvec(Spikes.locs{j}) < (analysisParams.io.pulsestart+analysisParams.io.pulsedur));
-    
-    if ~isempty(ind)
-        Spikes.pks{j} = Spikes.pks{j}(ind);
-        Spikes.locs{j} = Spikes.locs{j}(ind);
-        Spikes.num{j} = [length(ind)];
-    else
-        Spikes.pks{j} = [];
-        Spikes.locs{j} = [];
-        Spikes.num{j} = [0];
-    end
-    
-end
-
-warning('on');
 

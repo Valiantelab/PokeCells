@@ -8,7 +8,7 @@ ahp.auc = {};
 ahp.min = {};
 numPoints = size(V, 1);
 
-baselineRange = 1:analysisParams.io.pulsestart*1e-3*sampRate; %differed
+baselineRange = int64(1:analysisParams.io.pulsestart*1e-3*sampRate); %differed
 %from post current injection bline
 
 baselineVec = ones(1, numPoints);
@@ -27,9 +27,14 @@ threshBaseline = [restingPotential - 2*stdRestingPotential, restingPotential + 2
 windowSize = 21; %odd value to center at this point
 
 
-ahpRange = wfend:length(V); %approximate range for AHP
+ahpRange = int64(wfend:length(V)); %approximate range for AHP
 ahpStart = find(V(ahpRange) <= restingPotential); % check when no longer depolarized, works
-ahpStart = ahpStart(1) + wfend;
+if ~isempty(ahpStart)    
+    ahpStart = int64(ahpStart(1) + wfend);
+else
+    disp('cannot find the start of AHP');
+    return
+end
 
 if ahpStart > wfend + length(baselineRange)*1.5;
     disp('Bad start to AHP')
